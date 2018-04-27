@@ -1,7 +1,7 @@
 #define POSITION_SIZE 128
 #define MESSAGE_SIZE 128
 
-#define SOCK_ADDRESS "/tmp/sock_01" 
+#define SOCK_ADDRESS "./sock" 
 
 
 #include <sys/types.h>

@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -pedantic -lpthread
+CFLAGS=-Wall -pedantic -g -lpthread
 DEPS = clipboard.h
 OBJ = clipboard.o 
 OBJ2 = library.o app_teste.o

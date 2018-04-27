@@ -72,7 +72,7 @@ int main(int argc, char** argv){
 	getchar();
 	
 	a=0;
-	for(i=atoi(argv[1]); i>0; i--){
+	for(i=atoi(argv[1])-1; i>=0; i--){
 		pthread_cancel(threads[i]);
 		a+=returns[i];
 	}

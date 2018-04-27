@@ -33,17 +33,15 @@ void * thread_1_handler(void * arg){
 	int mode =              ((T_param*)arg)->mode;
 	int err;
 	
-	int * exit_status = malloc(sizeof(int));
 	
 	while(1){
 		
-		printf(".\n");
+		printf("thread socket_id: %d\n", client_fd);
 
 		err = recv(client_fd, &m, m_size, 0);
 		if(err == -1){
 			perror("recv");
-			*exit_status = -1;
-			pthread_exit(exit_status);
+			pthread_exit(NULL);
 		}
 
 		m2=m;
@@ -53,8 +51,7 @@ void * thread_1_handler(void * arg){
 		
 			close(client_fd);
 			printf("Client disconnected\n");
-			*exit_status=0;
-			pthread_exit(exit_status);
+			pthread_exit(NULL);
 
 		}
 		if (m.flag == 1){
@@ -65,15 +62,13 @@ void * thread_1_handler(void * arg){
 			err = send(client_fd, &m, m_size, 0);
 			if (err == -1){
 				perror("send");
-				*exit_status = -1;
-				pthread_exit(exit_status);
+				pthread_exit(NULL);
 			}
 			if(mode == 1){
 				err = send(sock_s_fd, &m, m_size, 0);
 				if (err == -1){
 					perror("send");
-					*exit_status = -1;
-					pthread_exit(exit_status);
+					pthread_exit(NULL);
 				}
 			}
 		}
@@ -84,8 +79,7 @@ void * thread_1_handler(void * arg){
 			err = send(client_fd, &m2, m_size, 0);
 			if (err == -1){
 				perror("send");
-				*exit_status = -1;
-				pthread_exit(exit_status);
+				pthread_exit(NULL);
 			}
 		}
 	}
@@ -105,15 +99,13 @@ int main(int argc, char** argv){
 	//Other variables
 	int mode=-1;
 	char* clipboard_data[10];
-	char* data;
 	int err;
-	int client_fd;
+	int* client_fd = NULL;
 	const size_t m_size = sizeof(Message);
 	
 	//Threads
 	T_param param;
 	pthread_t thread_id;
-	void* exit_status;
 
 	
 	//sprintf(sock_address, "%s%d", SOCK_ADDRESS, getpid());
@@ -198,12 +190,7 @@ int main(int argc, char** argv){
 	}
 	printf("socket created and binded \n");
 	
-	data = malloc(m_size);
-	if(data == NULL){
-		printf("Error allocating memory.\n");	
-		unlink(sock_address);
-		exit(-1);	
-	}
+
 	
 	if(listen(sock_fd, 2) == -1) {
 		perror("listen");
@@ -211,34 +198,40 @@ int main(int argc, char** argv){
 		exit(-1);
 	}
 	
+		
+/*	param=malloc(sizeof(T_param));
+	if (param == NULL){
+		printf("Error allocating memory\n");
+		exit(-1);
+	}
+	*/
+	i=0;
 	
-	
-	
-	while(1){
-		//Accept connection
-	    client_fd = accept(sock_fd, (struct sockaddr *) & client_addr, &size_addr);
-		if(client_fd == -1) {
+	while(1){ 
+		    
+		client_fd = realloc(client_fd, (i+1) * sizeof(int));
+//		param     = realloc(param, (i+1) * sizeof(T_param));
+		size_addr = sizeof(struct sockaddr);
+		
+	    client_fd[i] = accept(sock_fd, (struct sockaddr *) & client_addr, &size_addr);
+		if(client_fd[i] == -1) {
 			perror("accept");
 			unlink(sock_address);
 			exit(-1);
 		}
-		printf("Client connected\n");
+		printf("Client connected \n");
 			
 		param.repository = clipboard_data;
-		param.sock_id = client_fd;
+		param.sock_id = client_fd[i];
 		param.mode=mode;
 		param.sock_s_fd=sock_s_fd;
 		
+//		printf("%d \n main sock_id: %d \n %d \n %d \n", param.repository, 
+//			param.sock_id, param.mode, param.sock_s_fd);
+		
 		pthread_create(&thread_id, NULL, thread_1_handler, &param);
 		
-		pthread_join(thread_id, &exit_status);
-		
-		if (*(int*)exit_status == -1){
-			unlink(sock_address);
-			exit(-1);
-		}
-		free(exit_status);
-		close(client_fd);
+		i++;
 	}	
 		
 	exit(0);
