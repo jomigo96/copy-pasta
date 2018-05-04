@@ -11,6 +11,7 @@ int main(void){
 		
 		printf("LCD=%d\n", lcd(p1,p2));
 		
+		/* Hello, this is dog. */
 	}
 	return 0;
 }
