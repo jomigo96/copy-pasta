@@ -1,28 +1,26 @@
 CC=gcc
-CPPFLAGS=-c -Wall -pedantic
-LDFLAGS=-lm
-EXECUTABLE=main
-DOCC=doxygen
+CFLAGS=-Wall -pedantic -g
+LDFLAGS = -lpthread -lm
+DEPS = clipboard.h
+OBJ= library.o app_teste.o clipboard.o backup.o
+EXECUTABLES = clipboard app_teste backup
 
-SOURCES=$(wildcard *.c)
-OBJECTS=$(notdir $(SOURCES:.c=.o))
-DOCDIR=../doc
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+	
+all: $(OBJ)
+	$(MAKE) clipboard
+	$(MAKE) app_teste
+	$(MAKE) backup
 
-all: $(SOURCES) $(EXECUTABLE) doc
-  
-$(EXECUTABLE): $(OBJECTS) 
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $@ 
-
-.cc.o:
-	$(CC) $(CPPFLAGS) $< -o $@
-
-doc:
-	@$(DOCC) 1>/dev/null
+clipboard: clipboard.o
+	gcc -o $@ $^ $(LDFLAGS)
+		
+app_teste: app_teste.o library.o
+	gcc -o $@ $^ $(LDFLAGS)
+	
+backup: backup.o
+	gcc -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -rf $(OBJECTS) $(EXECUTABLE) $(DOCDIR)/html $(DOCDIR)/latex
-
-run: $(EXECUTABLE)
-	./$(EXECUTABLE)
-
-.PHONY: all doc clean
+	rm -rf $(OBJ) $(EXECUTABLES) 

@@ -1,21 +1,26 @@
 CC=gcc
-CFLAGS=-Wall -pedantic -g -lpthread
+CFLAGS=-Wall -pedantic -g
+LDFLAGS = -lpthread -lm
 DEPS = clipboard.h
-OBJ = clipboard.o 
-OBJ2 = library.o app_teste.o
-OBJ3 = backup.o
+OBJ= library.o app_teste.o clipboard.o backup.o
+EXECUTABLES = clipboard app_teste backup
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
-
-clipboard: $(OBJ)
-	gcc -o $@ $^ $(CFLAGS)
-		
-app_teste: $(OBJ2)
-	gcc -o $@ $^ $(CFLAGS)
 	
-backup: $(OBJ3)
-	gcc -o $@ $^ $(CFLAGS)
+all: $(OBJ)
+	$(MAKE) clipboard
+	$(MAKE) app_teste
+	$(MAKE) backup
+
+clipboard: clipboard.o
+	gcc -o $@ $^ $(LDFLAGS)
+		
+app_teste: app_teste.o library.o
+	gcc -o $@ $^ $(LDFLAGS)
+	
+backup: backup.o
+	gcc -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm $(OBJ) $(OBJ2) $(OBJ3) clipboard app_teste backup
+	rm -rf $(OBJ) $(EXECUTABLES) 
