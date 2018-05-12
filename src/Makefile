@@ -1,7 +1,7 @@
 CC=gcc
-CFLAGS=-Wall -pedantic -g
+CFLAGS=-Wall -pedantic 
 LDFLAGS = -lpthread -lm
-DEPS = clipboard.h
+DEPS = clipboard.h list.h
 OBJ= library.o app_teste.o clipboard.o backup.o list.o
 EXECUTABLES = clipboard app_teste backup
 
@@ -13,7 +13,7 @@ all: $(OBJ)
 	$(MAKE) app_teste
 	$(MAKE) backup
 
-clipboard: clipboard.o
+clipboard: clipboard.o list.o
 	gcc -o $@ $^ $(LDFLAGS)
 		
 app_teste: app_teste.o library.o

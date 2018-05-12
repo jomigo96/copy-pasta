@@ -15,7 +15,6 @@ doc:
 clean:
 	$(MAKE) -C $(MAIN_DIR) clean
 	rm -rf doc/html doc/latex
-	$(MAKE) -C $(TEST_DIR) clean
 
 run-test:
 	$(MAKE) -C $(TEST_DIR) run

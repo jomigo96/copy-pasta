@@ -14,6 +14,7 @@
 #include <pthread.h>
 
 #include "clipboard.h"
+//#include "list.h"
 
 char sock_address[64];
 
@@ -32,6 +33,7 @@ void * thread_1_handler(void * arg){
 	char** clipboard_data = ((T_param*)arg)->repository;
 	int sock_s_fd =         ((T_param*)arg)->sock_s_fd;
 	int mode =              ((T_param*)arg)->mode;
+	Client* list=           ((T_param*)arg)->list;
 	int err;
 	
 	
@@ -51,6 +53,7 @@ void * thread_1_handler(void * arg){
 		if (m.flag == 0){
 		
 			close(client_fd);
+			client_remove(list, client_fd);
 			printf("Client disconnected\n");
 			pthread_exit(NULL);
 
@@ -102,7 +105,8 @@ int main(int argc, char** argv){
 	int mode=-1;
 	char* clipboard_data[10];
 	int err;
-	int* client_fd = NULL;
+	Client* c_list=client_init();
+	int client_fd;
 	const size_t m_size = sizeof(Message);
 	
 	//Threads
@@ -201,30 +205,28 @@ int main(int argc, char** argv){
 	}
 	
 		
-/*	param=malloc(sizeof(T_param));
-	if (param == NULL){
-		printf("Error allocating memory\n");
-		exit(-1);
-	}
-	*/
+
 	i=0;
 	
 	while(1){ 
 		    
-		client_fd = realloc(client_fd, (i+1) * sizeof(int));
 //		param     = realloc(param, (i+1) * sizeof(T_param));
 		size_addr = sizeof(struct sockaddr);
 		
-	    client_fd[i] = accept(sock_fd, (struct sockaddr *) & client_addr, &size_addr);
-		if(client_fd[i] == -1) {
+	    client_fd = accept(sock_fd, (struct sockaddr *) & client_addr, &size_addr);
+		if(client_fd == -1) {
 			perror("accept");
 			unlink(sock_address);
 			exit(-1);
 		}
+		
+		client_pushback(c_list, client_fd);
+		
 		printf("Client connected \n");
 			
 		param.repository = clipboard_data;
-		param.sock_id = client_fd[i];
+		param.list = c_list;
+		param.sock_id=client_fd;
 		param.mode=mode;
 		param.sock_s_fd=sock_s_fd;
 		

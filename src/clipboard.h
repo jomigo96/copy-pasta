@@ -4,17 +4,19 @@
 #define SOCK_ADDRESS "./sock" 
 
 #include <sys/types.h>
+#include "list.h"
 
 typedef struct message{
 	
-	short entry;
-	char msg[MESSAGE_SIZE];
-	short flag;
+	short entry; 
+	char msg[MESSAGE_SIZE]; 
+	short flag; 
 	
 }Message;
 
 typedef struct thread_parameters{
 
+	Client* list;
 	int sock_id;
 	char** repository;
 	int mode;
