@@ -1,14 +1,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/queue.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <unistd.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
@@ -16,6 +16,7 @@
 #include "clipboard.h"
 
 char sock_address[64];
+
 
 void ctrl_c_callback_handler(int signum){
 	printf("Caught signal Ctr-C\n");
@@ -86,6 +87,7 @@ void * thread_1_handler(void * arg){
 }
  
 int main(int argc, char** argv){
+	
 	
 	// Unix socket
 	struct sockaddr_un local_addr;

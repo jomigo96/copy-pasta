@@ -2,7 +2,7 @@ CC=gcc
 CFLAGS=-Wall -pedantic -g
 LDFLAGS = -lpthread -lm
 DEPS = clipboard.h
-OBJ= library.o app_teste.o clipboard.o backup.o
+OBJ= library.o app_teste.o clipboard.o backup.o list.o
 EXECUTABLES = clipboard app_teste backup
 
 %.o: %.c $(DEPS)

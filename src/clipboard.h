@@ -3,7 +3,6 @@
 
 #define SOCK_ADDRESS "./sock" 
 
-
 #include <sys/types.h>
 
 typedef struct message{
