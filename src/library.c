@@ -51,7 +51,7 @@ int clipboard_copy(int clipboard_id, int region, void *buf, size_t count){
 		return -1;
 	
 	m.entry = region;
-	m.flag = 1;
+	m.flag = COPY;
 	
 	
 	strcpy(m.msg, (char*)buf);
@@ -87,7 +87,7 @@ int clipboard_paste(int clipboard_id, int region, void *buf, size_t count){
 		return -1;
 		
 	m.entry = region;
-	m.flag = 2;
+	m.flag = PASTE;
 		
 	int err;	
 		
@@ -125,7 +125,7 @@ void clipboard_close(int clipboard_id){
 	
 	Message m;
 	
-	m.flag = 0;
+	m.flag = DISCONNECT;
 	
 	int err = send(clipboard_id, &m, sizeof(Message), 0);
 	if (err == -1){

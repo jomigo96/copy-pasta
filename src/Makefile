@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -pedantic 
+CFLAGS=-Wall -pedantic -g
 LDFLAGS = -lpthread -lm
 DEPS = clipboard.h list.h
 OBJ= library.o app_teste.o clipboard.o  
@@ -11,7 +11,6 @@ EXECUTABLES = clipboard app_teste backup
 all: $(OBJ)
 	$(MAKE) clipboard
 	$(MAKE) app_teste
-	$(MAKE) backup
 
 clipboard: clipboard.o 
 	gcc -o $@ $^ $(LDFLAGS)

@@ -5,6 +5,13 @@
 
 #include <sys/types.h>
 
+#define PEER_SERVICE 0
+#define APP_SERVICE 1
+#define DISCONNECT 0
+#define COPY 1
+#define PASTE 2
+#define REDIRECT 3
+
 typedef struct message{
 	
 	short entry; 

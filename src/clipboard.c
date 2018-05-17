@@ -12,6 +12,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <errno.h>
 
 #include "clipboard.h"
 
@@ -118,6 +119,11 @@ int main(int argc, char** argv){
 				strcpy(clipboard_data[i], r1.msg);
 			}
 		
+		//Launch handler for this peer
+		param.sock_id=sock_s_fd;
+		param.peers=&peers;
+		param.mode=0;
+		pthread_create(&thread_id, NULL, thread_1_handler, &param);
 	}
 	
 	
@@ -189,36 +195,54 @@ void * thread_1_handler(void * arg){
 	//mode 0-talking with another clipboard; 1-talking with an app
 	int mode =       ((T_param*)arg)->mode;
 	int err;
+	int flag;
 	
-	Message m, m2;
+	Message m;
 	const size_t m_size = sizeof(Message);
 	int i;
 	
 	while(1){
 		
 		err = recv(client_fd, &m, m_size, 0);
+		printf("err = %d\n",err);
 		if(err == -1){
-			perror("recv");
-			if(mode==0){
+			printf("ERROR %d\n", errno);
+			if(errno==ECONNRESET){
+				
+				printf("Disconnected\n");
+				close(client_fd);
+				
+				if(mode==PEER_SERVICE){
+					remove_fd(peers, client_fd);
+				}
+			}else{
+				perror("recv");
+			}
+			pthread_exit(NULL);
+		}
+		if (err == 0 ){ //Assume client disconnected
+			close(client_fd);
+			printf("Disconnected\n");
+			if(mode==PEER_SERVICE){
 				remove_fd(peers, client_fd);
 			}
 			pthread_exit(NULL);
 		}
 
-		m2=m;
+		flag=m.flag;
 		
 		// also needs to check if the clipboard has enough memory
-		if (m.flag == 0){ //Disconnect
+		if (flag == DISCONNECT){ 
 		
 			close(client_fd);
 			printf("Client disconnected\n");
-			if(mode==0){
+			if(mode==PEER_SERVICE){
 				remove_fd(peers, client_fd);
 			}
 			pthread_exit(NULL);
 
 		}
-		if (m.flag == 1){ //Copy
+		if (flag == COPY){ 
 		
 			printf("Writing in clipboard position %hi\n", m.entry);
 			printf("%s\n",m.msg);
@@ -226,49 +250,68 @@ void * thread_1_handler(void * arg){
 			err = send(client_fd, &m, m_size, 0);
 			if (err == -1){
 				perror("send");
-				if(mode==0){
-				remove_fd(peers, client_fd);
+				if(mode==PEER_SERVICE){
+					remove_fd(peers, client_fd);
 				}
+				close(client_fd);
 				pthread_exit(NULL);
 			}
 			if(peers->count > 0){
+				m.flag = REDIRECT;
 				
 				for(i=0; i<peers->count; i++){
 					
 					if (client_fd != peers->sock[i]){
 						
+						printf("Sending to peer fd %d\n", peers->sock[i]);
+						
 						err = send(peers->sock[i], &m, m_size, 0);
 						if (err == -1){
 							perror("send");
-							if(mode==0){
-								remove_fd(peers, client_fd);
-							}
-							pthread_exit(NULL);
-						}
-						err = send(peers->sock[i], &m, m_size, 0);
-						if (err == -1){
-							perror("send");
-							if(mode==0){
-							remove_fd(peers, client_fd);
-							}
-							pthread_exit(NULL);
+							remove_fd(peers, peers->sock[i]);
+							close(peers->sock[i]);
+							i--;
+							continue;
 						}
 					}
 				}
 			}
 		}
-		else if (m.flag == 2){ //Paste
+		if (flag == PASTE){ //Paste
 			
 			printf("Sending back clipboard position %hi\n", m.entry);
-			strcpy(m2.msg, clipboard_data[m.entry]);
-			err = send(client_fd, &m2, m_size, 0);
+			strcpy(m.msg, clipboard_data[m.entry]);
+			err = send(client_fd, &m, m_size, 0);
 			if (err == -1){
 				perror("send");
-				if(mode==0){
+				if(mode==PEER_SERVICE){
 					remove_fd(peers, client_fd);
 				}
 				pthread_exit(NULL);
 			}
+		}
+		if (flag == REDIRECT){
+			
+			printf("Synchronizing entry %hi\n", m.entry);
+			printf("%s\n",m.msg);
+			strcpy(clipboard_data[m.entry], m.msg);
+			
+			for(i=0; i<peers->count; i++){
+					
+					if (client_fd != peers->sock[i]){
+						
+						printf("Sending to peer fd %d\n", peers->sock[i]);
+						
+						err = send(peers->sock[i], &m, m_size, 0);
+						if (err == -1){
+							perror("send");
+							remove_fd(peers, peers->sock[i]);
+							close(peers->sock[i]);
+							i--;
+							continue;
+						}
+					}
+				}
 		}
 	}
 }
