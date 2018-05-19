@@ -33,7 +33,6 @@ void ctrl_c_callback_handler(int signum){
  
 int main(int argc, char** argv){
 	
-	
 	// Unix socket
 	struct sockaddr_un local_addr;
 	struct sockaddr_un client_addr;
@@ -54,6 +53,7 @@ int main(int argc, char** argv){
 	int err;
 	int client_fd;
 	const size_t m_size = sizeof(Message);
+	void* buf;
 	
 	//Threads
 	T_param param;
@@ -66,13 +66,15 @@ int main(int argc, char** argv){
 	
 	//Build clipboard
 	for (i=0; i<10; i++){
-		clipboard.data[i]=malloc(MESSAGE_SIZE*sizeof(char));
+		clipboard.data[i]=NULL;
+		clipboard.size[i]=0;
+/*		clipboard.data[i]=malloc(MESSAGE_SIZE);
 		if (clipboard.data[i] == NULL){
 			printf("Error allocating clipboard memory.\n");
 			unlink(SOCK_ADDRESS);
 			exit(-1);
 		}
-		clipboard.size[i]=MESSAGE_SIZE;
+		clipboard.size[i]=MESSAGE_SIZE;*/
 	}
 	
 	// Connect to remote repository
@@ -90,32 +92,76 @@ int main(int argc, char** argv){
 		inet_aton(argv[2], &server_addr.sin_addr);
 		
 		if( -1 == connect(sock_s_fd, 
-			(const struct sockaddr *) &server_addr, 
-			sizeof(server_addr))){
-				printf("Error connecting\n");
-				exit(-1);
-		}
+								(const struct sockaddr *) &server_addr, 
+												sizeof(server_addr))){
+			printf("Error connecting, starting in single mode\n");
+				
+		}else{
 		
-		peers.count++;
-		peers.sock = realloc(peers.sock, peers.count*sizeof(int));
-		peers.sock[peers.count-1]=sock_s_fd;
-	 
-/*		//Synchronizing
+			peers.count++;
+			peers.sock = realloc(peers.sock, peers.count*sizeof(int));
+			peers.sock[peers.count-1]=sock_s_fd;
+		 
+			//Synchronizing
 			printf("Synchronizing repository\n");
 			Message r1;
+				
 			for(i=0; i<10; i++){
 				r1.entry=i;
-				r1.flag=2;
-				send(sock_s_fd, &r1, m_size, 0);  //Need to secure these
-				recv(sock_s_fd, &r1, m_size, 0);
-				strcpy(clipboard[i], r1.msg);
+				r1.flag=PASTE;
+				
+				err = send(sock_s_fd, &r1, m_size, 0);
+				if (err <=0 ){
+					printf("error syncing\n");
+					remove_fd(&peers, sock_s_fd);
+					close(sock_s_fd);
+					break;
+				}
+				
+				err = recv(sock_s_fd, &r1, m_size, 0);
+				if (err <= 0){
+					printf("error syncing\n");
+					remove_fd(&peers, sock_s_fd);
+					close(sock_s_fd);
+					break;
+				}
+				if (r1.flag == NOERROR)
+					continue;
+						
+				clipboard.data[i] = 
+							realloc(clipboard.data[i], r1.size);
+				if (clipboard.data[i] == NULL){
+					perror("realloc");
+					exit(-1);
+				}
+				clipboard.size[i]=r1.size;
+				
+				buf=clipboard.data[i];
+				
+				while (r1.size > MESSAGE_SIZE){
+				
+					memcpy(buf, r1.msg, MESSAGE_SIZE);
+					buf = (char*)buf + MESSAGE_SIZE;
+					err = recv(sock_s_fd, &r1, m_size, 0);
+					if (err <= 0){
+						printf("error syncing\n");
+						remove_fd(&peers, sock_s_fd);
+						close(sock_s_fd);
+						break;
+					}
+				}
+				memcpy(buf, r1.msg, r1.size);
+
+				printf("Syncing clipboard position %hi\n", i);
+				print_entry(i);
 			}
-*/		
+			
 		//Launch handler for this peer
 		param.sock_id=sock_s_fd;
 		param.peers=&peers;
 		param.mode=0;
 		pthread_create(&thread_id, NULL, thread_1_handler, &param);
+		}
 	}
 	
 	
@@ -185,34 +231,21 @@ void * thread_1_handler(void * arg){
 	const int mode = ((T_param*)arg)->mode;
 	int err;
 	int flag;
+	int i;
 	
 	Message m;
 	const size_t m_size = sizeof(Message);
 	
 	void * buf;
 	
+	printf("Thread %lu handling client with fd %d\n", pthread_self(), client_fd);
+	
 	while(1){
 		
 		err = recv(client_fd, &m, m_size, 0);
-		if(err == -1){
-			printf("ERROR %d\n", errno);
-			if(errno==ECONNRESET){
-				
-				printf("Disconnected\n");
-				close(client_fd);
-				
-				if(mode==PEER_SERVICE){
-					remove_fd(peers, client_fd);
-				}
-			}else{
-				perror("recv");
-			}
-			pthread_exit(NULL);
-		}
-		
-		if (err == 0 ){ //Assume client disconnected
-			close(client_fd);
+		if(err <= 0){
 			printf("Disconnected\n");
+			close(client_fd);
 			if(mode==PEER_SERVICE){
 				remove_fd(peers, client_fd);
 			}
@@ -276,27 +309,52 @@ void * thread_1_handler(void * arg){
 				}
 			}
 			
-			
-			/*if(peers->count > 0){
+			// Replicate to other clipboards
+			if(peers->count > 0){
 				m.flag = REDIRECT;
 				
 				for(i=0; i<peers->count; i++){
 					
 					if (client_fd != peers->sock[i]){
+						printf("Sending to peer with fd %d\n", 
+														peers->sock[i]);
 						
-						printf("Sending to peer fd %d\n", peers->sock[i]);
+						buf=clipboard.data[m.entry];
+						m.size=clipboard.size[m.entry];
+						memcpy(m.msg, buf, MESSAGE_SIZE);
 						
-						err = send(peers->sock[i], &m, m_size, 0);
-						if (err == -1){
-							perror("send");
-							remove_fd(peers, peers->sock[i]);
-							close(peers->sock[i]);
-							i--;
-							continue;
+						while (m.size > MESSAGE_SIZE){
+							
+							
+								memcpy(m.msg, buf, MESSAGE_SIZE);
+
+								err = send(peers->sock[i], &m,m_size,0);
+								if (err == -1){
+									perror("send");
+									remove_fd(peers, peers->sock[i]);
+									close(peers->sock[i]);
+									i--;
+									continue;
+								}
+						
+								m.size = m.size - MESSAGE_SIZE;
+								buf = (char*)buf + MESSAGE_SIZE;
+							
+						}
+						if(m.size > 0){
+							memcpy(m.msg, buf, m.size);
+							err = send(peers->sock[i], &m, m_size, 0);
+							if (err == -1){
+								perror("send");
+								remove_fd(peers, peers->sock[i]);
+								close(peers->sock[i]);
+								i--;
+								continue;
+							}
 						}
 					}
 				}
-			}*/
+			}
 		}
 		if (flag == PASTE){
 			
@@ -313,6 +371,7 @@ void * thread_1_handler(void * arg){
 					close(client_fd);
 					pthread_exit(NULL);
 				}
+				continue;
 			}
 			
 			buf=clipboard.data[m.entry];

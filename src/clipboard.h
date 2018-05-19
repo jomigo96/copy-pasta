@@ -1,4 +1,4 @@
-#define MESSAGE_SIZE 128
+#define MESSAGE_SIZE 8
 
 #define SOCK_ADDRESS "./sock" 
 
