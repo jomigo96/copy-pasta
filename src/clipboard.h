@@ -1,4 +1,3 @@
-#define POSITION_SIZE 128
 #define MESSAGE_SIZE 128
 
 #define SOCK_ADDRESS "./sock" 
@@ -7,15 +6,18 @@
 
 #define PEER_SERVICE 0
 #define APP_SERVICE 1
+
 #define DISCONNECT 0
 #define COPY 1
 #define PASTE 2
 #define REDIRECT 3
+#define NOERROR 4
 
 typedef struct message{
 	
 	short entry; 
-	char msg[MESSAGE_SIZE]; 
+	char msg[MESSAGE_SIZE];
+	size_t size; 
 	short flag; 
 	
 }Message;
@@ -33,6 +35,12 @@ typedef struct thread_parameters{
 	C_peers* peers;
 	
 }T_param;
+
+struct clip_data{
+	
+	void* data[10];
+	size_t size[10];
+};
 
 
 int clipboard_connect(char * clipboard_dir);
@@ -80,5 +88,5 @@ void * thread_2_handler(void * arg);
  * */
 void remove_fd(C_peers * peerv, int fd);
 
-
+void print_entry(int entry);
 

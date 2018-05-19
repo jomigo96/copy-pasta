@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 int main(){
 
 		int fd = clipboard_connect("./");
@@ -34,22 +35,21 @@ int main(){
 				
 				//printf("Calling copy with [%s]\n", dados);
 				
-				code=clipboard_copy(fd, entry, dados, size);
-				if(code != -1)
-					printf("Success\n");
+				code=clipboard_copy(fd, entry, dados, strlen(dados)+1);
+				if(code > 0)
+					printf("Success, sent %d bytes\n", code);
 				else
 					printf("Failure\n");
+					
+				memset(dados, 0, size);
 			}
 			if (opt == 2){
 				printf("Entry: ");
 				scanf("%d", &entry);
 				while(getchar() != '\n');
 				code=clipboard_paste(fd, entry, dados, size);
-				if(code != -1){
-					printf("Success\n");
-					
-					dados[code]=0;
-					
+				if(code > 0){
+					printf("Success, received %d bytes\n", code);
 					printf("Message: %s\n",dados);
 				}
 				else

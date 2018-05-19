@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <math.h>
 
 #include "clipboard.h"
 
@@ -37,6 +38,9 @@ int clipboard_connect(char * clipboard_dir){
 	}
 	
 	printf("connected to clipboard\n");
+	
+	signal(SIGPIPE, SIG_IGN);
+	
 	return sock_fd;
 
 }
@@ -44,81 +48,100 @@ int clipboard_connect(char * clipboard_dir){
 int clipboard_copy(int clipboard_id, int region, void *buf, size_t count){
 	
 	Message m;
+	int err;
+	int sent=0;
 
-	if ((count-1) > sizeof(char)*MESSAGE_SIZE)
-		return -1;
 	if ((region>9)||(region<0))
-		return -1;
+		return 0;
 	
 	m.entry = region;
 	m.flag = COPY;
 	
+	while (count > MESSAGE_SIZE){
 	
-	strcpy(m.msg, (char*)buf);
+		m.size=count;
 	
-
-	//printf("%s\n",m.msg);
-	int err;
+		memcpy(m.msg, buf, MESSAGE_SIZE);
 		
-	err = send(clipboard_id, &m, sizeof(Message),0);
-	if (err == -1){
-		printf("Error sending message\n");
-		return -1;
+		err = send(clipboard_id, &m, sizeof(Message),0);
+		if (err <= 0){
+			printf("Error sending message\n");
+			return 0;
+		}
+		sent+=MESSAGE_SIZE;
+		buf = (char*)buf + MESSAGE_SIZE;
+		count = count - MESSAGE_SIZE;
 	}
+	
+	if (count > 0){
+		m.size = count;
+		memcpy(m.msg, buf, count);
+		err = send(clipboard_id, &m, sizeof(Message),0);
+		if (err == -1){
+			printf("Error sending message\n");
+			return 0;
+		}
+		sent+=count;
+	}
+	
+	
 	err = recv(clipboard_id, &m, sizeof(Message),0);
 	if (err == -1){
 		printf("Error retreiving response\n");
-		return -1;
+		return 0;
 	}
-	
-	if (m.flag == 1)
-		return 1;
+	if (m.flag == NOERROR)
+		return sent;
 	else
-		return -1;
-	
+		return 0;
 }
 int clipboard_paste(int clipboard_id, int region, void *buf, size_t count){
 	
 	Message m;
-	int m_size;	
-	
+	int err;
+	int copied;
 		
 	if ((region>9)||(region<0))
-		return -1;
+		return 0;
 		
 	m.entry = region;
 	m.flag = PASTE;
 		
-	int err;	
 		
 	err = send(clipboard_id, &m, sizeof(Message),0);
 	if (err == -1){
 		printf("Error sending message\n");
-		return -1;
+		return 0;
 	}
+
 	err = recv(clipboard_id, &m, sizeof(Message),0);
-	if (err == -1){
+	if ((err == -1) || (err != sizeof(Message))){
 		printf("Error retreiving response\n");
-		return -1;
+		return 0;
 	}
-	
-	if (m.flag == 2){
-		m_size=strlen(m.msg)+1;
+	if(m.flag == NOERROR) //empty entry
+		return 0;
 		
-		if(m_size > count){
-			printf("Error: buffer size insufficient.\n");
-			return -1;
+	copied = (count >= m.size) ? m.size : count;
+	
+	while (m.size > MESSAGE_SIZE){
+
+		if(count >= MESSAGE_SIZE){
+			memcpy(buf, m.msg, MESSAGE_SIZE);
+			count = count - MESSAGE_SIZE;
 		}
-			
-		//printf("%s\n",m.msg);
-			
-		strcpy((char*)buf, m.msg);
-		return m_size;
 		
+		err = recv(clipboard_id, &m, sizeof(Message),0);
+		if ((err == -1) || (err != sizeof(Message))){
+			printf("Error retreiving response\n");
+			return 0;
+		}
+		buf = (char*)buf + MESSAGE_SIZE;
 	}
-	else
-		return -1;
 	
+	memcpy(buf, m.msg, count);
+	
+	return copied;
 }
 
 void clipboard_close(int clipboard_id){
@@ -127,10 +150,13 @@ void clipboard_close(int clipboard_id){
 	
 	m.flag = DISCONNECT;
 	
-	int err = send(clipboard_id, &m, sizeof(Message), 0);
-	if (err == -1){
-		printf("Error sending message\n");
-		exit(-1);
-	}
+	send(clipboard_id, &m, sizeof(Message), 0);
 	close(clipboard_id);
 }
+
+
+
+
+
+
+
