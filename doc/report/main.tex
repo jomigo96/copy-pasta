@@ -1,0 +1,56 @@
+% ------------------------------ 76 characters -----------------------------
+\documentclass{article}
+
+\input{preamble}
+
+\begin{document}
+
+\begin{titlepage}
+	\includegraphics[viewport=9.5cm 11cm 0cm 0cm,scale=0.29]{IST_A_CMYK_POS}
+	
+	\begin{center}
+		\vspace{70mm} % --  Espaço em branco
+		\rule{\linewidth}{0.5pt} \\
+		\Huge \textsc{Clipboard Distribuído} \\
+		\rule{\linewidth}{2pt} \\
+		\vspace{10mm} % -- Espaço em branco
+		\LARGE Projecto Final
+		
+		\vspace{\fill} % --  Espaço em branco variável
+		\large
+		Daniel de Schiffart \texttt{81479} \\
+		João Gonçalves \texttt{81040}
+		
+		\vspace{10mm} % --  Espaço em branco
+        \Large Instituto Superior Técnico \\
+        \textit{Mestrado em Engenharia Aeroespacial} \\
+        \vspace{1mm}
+        \large Programação de Sistemas
+		
+		\vspace{10mm} % --  Espaço em branco
+		\Large Maio de 2018
+	\end{center}
+\end{titlepage}
+
+\section{Objetivo}
+
+Para o projeto final da unidade curricular de Programação de Sistemas do
+segundo semestre do ano curricular de 2017/2018 foi desenvolvido e
+implementado um \textit{clipboard} distribuído em C. O objetivo do
+projeto proposto consistia na implementação do ante-referido 
+\textit{clipboard} através de uma biblioteca, uma API e um processo
+local que controlassem o funcionamento do mesmo.
+
+O funcionamento do \textit{clipboard} distribuído é análogo ao
+funcionamento da função de copiar-colar implementada em muitos diferentes
+programas e sistemas. Uma API permite a outras aplicações comunicar com
+um processo local (o \textit{clipboard} local) e guardar e retirar dados
+temporariamente, que serão sincronizados com outras instâncias do mesmo
+\textit{clipboard} local que estão em funcionamento em outros sistemas,
+desde que estejam conectados entre si. O conjunto das instâncias deste
+\textit{clipboard} terá então os mesmos dados guardados em todos os
+sistemas, facilitando assim a comunicação de dados entre estes.
+Cada conjunto de \textit{clipboards} interligados tem espaço para
+armazenamento de dez variáveis diferentes, identificados de 1 a 10.
+
+\end{document}
