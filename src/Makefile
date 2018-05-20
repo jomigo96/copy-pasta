@@ -1,23 +1,28 @@
 CC=gcc
-CFLAGS=-Wall -pedantic -g
+CFLAGS= -Wall -pedantic -g
 LDFLAGS = -lpthread -lm
-DEPS = clipboard.h list.h
-OBJ= library.o app_teste.o clipboard.o  
-EXECUTABLES = clipboard app_teste backup
+DEPS = clipboard.h 
+OBJ= app_teste.o clipboard.o clipboard_func.o
+EXECUTABLES = clipboard app_teste 
 
 %.o: %.c $(DEPS)
 	$(CC) -c -o $@ $< $(CFLAGS)
+	
+%.so: library.c $(DEPS)
+	$(CC) $(CFLAGS) -fPIC -c library.c
+	$(CC) -shared -Wl,-soname,libclipboard.so -o libclipboard.so library.o
+	rm -rf library.o
+	mv libclipboard.so ./lib
 	
 all: $(OBJ)
 	$(MAKE) clipboard
 	$(MAKE) app_teste
 
-clipboard: clipboard.o 
-	gcc -o $@ $^ $(LDFLAGS)
+clipboard: clipboard.o clipboard_func.o
+	$(CC) -o $@ $^ $(LDFLAGS)
 		
-app_teste: app_teste.o library.o
-	gcc -o $@ $^ $(LDFLAGS)
+app_teste: app_teste.o ./lib/libclipboard.so
+	$(CC) -o $@ app_teste.o $(LDFLAGS) -L$ORIGIN/lib -lclipboard -Wl,-rpath=$ORIGIN/lib
 	
-
 clean:
-	rm -rf $(OBJ) $(EXECUTABLES) 
+	rm -rf $(OBJ) $(EXECUTABLES) ./lib/libclipboard.so

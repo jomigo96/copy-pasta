@@ -1,4 +1,4 @@
-#define MESSAGE_SIZE 8
+#define MESSAGE_SIZE 128
 
 #define SOCK_ADDRESS "./sock" 
 
@@ -89,4 +89,6 @@ void * thread_2_handler(void * arg);
 void remove_fd(C_peers * peerv, int fd);
 
 void print_entry(int entry);
+
+void ctrl_c_callback_handler(int signum);
 
