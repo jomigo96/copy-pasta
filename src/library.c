@@ -152,6 +152,64 @@ int clipboard_paste(int clipboard_id, int region, void *buf, size_t count){
 	return copied;
 }
 
+int clipboard_wait(int clipboard_id, int region, void* buf, size_t count){
+	
+	Message m;
+	int err;
+	int copied;
+	void *aux, *aux2;
+		
+	if ((region>9)||(region<0))
+		return 0;
+		
+	m.entry = region;
+	m.flag = WAIT;
+		
+	err = send(clipboard_id, &m, sizeof(Message),0);
+	if (err == -1){
+		printf("Error sending message\n");
+		return 0;
+	}
+
+	err = recv(clipboard_id, &m, sizeof(Message),0);
+	if ((err == -1) || (err != sizeof(Message))){
+		printf("Error retreiving response\n");
+		return 0;
+	}
+	if(m.flag == NOERROR) //empty entry
+		return 0;
+		
+	aux=malloc(m.size);
+	if(aux==NULL){
+		perror("malloc");
+		return 0;
+	}
+	aux2=aux;
+	
+	copied = (count >= m.size) ? m.size : count;
+	
+	while (m.size > MESSAGE_SIZE){
+
+		memcpy(aux2, m.msg, MESSAGE_SIZE);
+
+		err = recv(clipboard_id, &m, sizeof(Message),0);
+		if ((err == -1) || (err != sizeof(Message))){
+			printf("Error retreiving response\n");
+			return 0;
+		}
+		aux2 = (char*)aux2 + MESSAGE_SIZE;
+		
+	}
+	
+	memcpy(aux2, m.msg, m.size);
+	memcpy(buf, aux, copied);
+	free(aux);
+	
+	return copied;	
+	
+}
+
+
 void clipboard_close(int clipboard_id){
 	
 	Message m;

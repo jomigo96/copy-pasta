@@ -17,8 +17,12 @@
 
 struct clip_data clipboard;
 
+//Secure data structures
+pthread_mutex_t m_clip = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t m_peers = PTHREAD_MUTEX_INITIALIZER;
 
-
+//Conditional wait
+pthread_cond_t cv_wait = PTHREAD_COND_INITIALIZER;
  
 int main(int argc, char** argv){
 	
@@ -49,6 +53,7 @@ int main(int argc, char** argv){
 	pthread_t thread_id;
 	pthread_t thread_id2;
 	
+	
 	//Assign handler to CTRL-C
 	signal(SIGINT, ctrl_c_callback_handler);
 	
@@ -57,13 +62,8 @@ int main(int argc, char** argv){
 	for (i=0; i<10; i++){
 		clipboard.data[i]=NULL;
 		clipboard.size[i]=0;
-/*		clipboard.data[i]=malloc(MESSAGE_SIZE);
-		if (clipboard.data[i] == NULL){
-			printf("Error allocating clipboard memory.\n");
-			unlink(SOCK_ADDRESS);
-			exit(-1);
-		}
-		clipboard.size[i]=MESSAGE_SIZE;*/
+		clipboard.waiting[i]=0;
+		clipboard.writing[i]=0;
 	}
 	
 	// Connect to remote repository

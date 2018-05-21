@@ -12,12 +12,13 @@
 #include <errno.h>
 
 extern struct clip_data clipboard;
-
-
+extern pthread_mutex_t m_clip;
+extern pthread_mutex_t m_peers;
+extern pthread_cond_t cv_copy;
+extern pthread_cond_t cv_wait;
 
 void * thread_1_handler(void * arg){
 	
-
 	int client_fd =  ((T_param*)arg)->sock_id;
 	C_peers* peers = ((T_param*)arg)->peers;
 	const int mode = ((T_param*)arg)->mode;
@@ -28,7 +29,9 @@ void * thread_1_handler(void * arg){
 	Message m;
 	const size_t m_size = sizeof(Message);
 	
-	void * buf;
+	void * buf=NULL;
+	void * buf2;
+	size_t size;
 	
 	printf("Thread %lu handling client with fd %d\n", pthread_self(), client_fd);
 	
@@ -39,7 +42,9 @@ void * thread_1_handler(void * arg){
 			printf("Disconnected\n");
 			close(client_fd);
 			if(mode==PEER_SERVICE){
+				pthread_mutex_lock(&m_peers);
 				remove_fd(peers, client_fd);
+				pthread_mutex_unlock(&m_peers);
 			}
 			pthread_exit(NULL);
 		}
@@ -51,42 +56,65 @@ void * thread_1_handler(void * arg){
 			close(client_fd);
 			printf("Client disconnected\n");
 			if(mode==PEER_SERVICE){
+				pthread_mutex_lock(&m_peers);
 				remove_fd(peers, client_fd);
+				pthread_mutex_unlock(&m_peers);
 			}
 			pthread_exit(NULL);
 
 		}
 		if ((flag == COPY) || (flag == REDIRECT)){ 
 			
-						
-			clipboard.data[m.entry] = 
-						realloc(clipboard.data[m.entry], m.size);
-			if (clipboard.data[m.entry] == NULL){
+			buf=realloc(buf, m.size);			
+			if(buf==NULL){
 				perror("realloc");
 				exit(-1);
 			}
-			clipboard.size[m.entry]=m.size;
 			
-			buf=clipboard.data[m.entry];
+			size=m.size;
+			buf2=buf;
 			
 			while (m.size > MESSAGE_SIZE){
 			
-				memcpy(buf, m.msg, MESSAGE_SIZE);
-				buf = (char*)buf + MESSAGE_SIZE;
+				memcpy(buf2, m.msg, MESSAGE_SIZE);
+				buf2 = (char*)buf2 + MESSAGE_SIZE;
 				err = recv(client_fd, &m, m_size, 0);
-				if ((err == -1) || (err == 0)){
+				if (err <= 0){
 					printf("Disconnected\n");
 					if(mode==PEER_SERVICE){
+						pthread_mutex_lock(&m_peers);
 						remove_fd(peers, client_fd);
+						pthread_mutex_unlock(&m_peers);
 					}
 					close(client_fd);
 					pthread_exit(NULL);
 				}
 			}
-			memcpy(buf, m.msg, m.size);
+			memcpy(buf2, m.msg, m.size);
+
 
 			printf("Writing in clipboard position %hi\n", m.entry);
+			
+			//Critical region
+			pthread_mutex_lock(&m_clip);
+			clipboard.data[m.entry] = 
+						realloc(clipboard.data[m.entry], size);
+			if (clipboard.data[m.entry] == NULL){
+				perror("realloc");
+				exit(-1);
+			}
+			memcpy(clipboard.data[m.entry], buf, size);
+			clipboard.size[m.entry]=size;
 			print_entry(m.entry);
+			
+			//Signal waiting threads
+			if (clipboard.waiting[m.entry] > 0){
+				clipboard.writing[m.entry]=1;
+				pthread_cond_broadcast(&cv_wait);
+			}
+			pthread_mutex_unlock(&m_clip);
+			//End critical region	
+			
 			
 			if (flag != REDIRECT){
 				m.flag=NOERROR;
@@ -94,16 +122,20 @@ void * thread_1_handler(void * arg){
 				if (err == -1){
 					perror("send");
 					if(mode==PEER_SERVICE){
+						pthread_mutex_lock(&m_peers);
 						remove_fd(peers, client_fd);
+						pthread_mutex_unlock(&m_peers);
 					}
 					close(client_fd);
 					pthread_exit(NULL);
 				}
 			}
 			
-			// Replicate to other clipboards
+			// Replicate to other clipboards - critical region
+			pthread_mutex_lock(&m_peers);
 			if(peers->count > 0){
 				m.flag = REDIRECT;
+				buf2=buf;
 				
 				for(i=0; i<peers->count; i++){
 					
@@ -111,9 +143,8 @@ void * thread_1_handler(void * arg){
 						printf("Sending to peer with fd %d\n", 
 														peers->sock[i]);
 						
-						buf=clipboard.data[m.entry];
-						m.size=clipboard.size[m.entry];
-						memcpy(m.msg, buf, MESSAGE_SIZE);
+						buf=buf2;
+						m.size=size;
 						
 						while (m.size > MESSAGE_SIZE){
 							
@@ -146,30 +177,48 @@ void * thread_1_handler(void * arg){
 						}
 					}
 				}
+				buf=buf2;
 			}
+			//End critical region
+			pthread_mutex_unlock(&m_peers);
 		}
 		if (flag == PASTE){
 			
 			printf("Sending back clipboard position %hi\n", m.entry);
 			
-			if (clipboard.size[m.entry] == 0){
+			//Critical region
+			pthread_mutex_lock(&m_clip);
+			size=clipboard.size[m.entry];
+			if (size == 0){
+				pthread_mutex_unlock(&m_clip);
 				m.flag=NOERROR;
 				err = send(client_fd, &m, m_size, 0);
 				if (err == -1){
 					perror("send");
 					if(mode==PEER_SERVICE){
+						pthread_mutex_lock(&m_peers);
 						remove_fd(peers, client_fd);
+						pthread_mutex_unlock(&m_peers);
 					}
 					close(client_fd);
 					pthread_exit(NULL);
 				}
 				continue;
+			}else{
+				buf=realloc(buf, size);
+				if(buf==NULL){
+					perror("realloc");
+					exit(-1);
+				}
+				memcpy(buf, clipboard.data[m.entry], size);		
+				pthread_mutex_unlock(&m_clip);
 			}
+			//end critical region
 			
-			buf=clipboard.data[m.entry];
-			m.size=clipboard.size[m.entry];
+			
+			buf2=buf;
+			m.size=size;
 			m.flag=PASTE;
-			memcpy(m.msg, buf, MESSAGE_SIZE);
 		
 			while (m.size > MESSAGE_SIZE){
 				
@@ -179,7 +228,9 @@ void * thread_1_handler(void * arg){
 				if (err == -1){
 					perror("send");
 					if(mode==PEER_SERVICE){
+						pthread_mutex_lock(&m_peers);
 						remove_fd(peers, client_fd);
+						pthread_mutex_unlock(&m_peers);
 					}
 					close(client_fd);
 					pthread_exit(NULL);
@@ -194,14 +245,77 @@ void * thread_1_handler(void * arg){
 				if (err == -1){
 					perror("send");
 					if(mode==PEER_SERVICE){
+						pthread_mutex_lock(&m_peers);
 						remove_fd(peers, client_fd);
+						pthread_mutex_unlock(&m_peers);
 					}
 					close(client_fd);
 					pthread_exit(NULL);
 				}
 			}
+			buf=buf2;
 		}
+		
+		if (flag == WAIT){
+			
+			pthread_mutex_lock(&m_clip);
+			clipboard.waiting[m.entry]++;
+			
+			while (clipboard.writing[m.entry] != 1){
+				pthread_cond_wait(&cv_wait, &m_clip);
+			}
+			
+			size = clipboard.size[m.entry];
+			if (size == 0){
+				if(0 == (clipboard.waiting[m.entry]--))
+					clipboard.writing[m.entry]=0;
+				pthread_mutex_unlock(&m_clip);
+				m.flag = NOERROR;
+				err = send(client_fd, &m, m_size, 0);
+				if (err == -1){
+					perror("send");
+					close(client_fd);
+					pthread_exit(NULL);
+				}
+				
+			}else{
+				buf = realloc(buf, size);
+				memcpy(buf, clipboard.data[m.entry], size);
+				
+				if(0 == (clipboard.waiting[m.entry]--))
+					clipboard.writing[m.entry]=0;
+				pthread_mutex_unlock(&m_clip);
+				
+				
+				buf2=buf;
+				m.size=size;
+			
+				while (m.size > MESSAGE_SIZE){
+					
+					memcpy(m.msg, buf, MESSAGE_SIZE);
 
+					err = send(client_fd, &m, m_size, 0);
+					if (err == -1){
+						perror("send");
+						close(client_fd);
+						pthread_exit(NULL);
+					}
+					
+					m.size = m.size - MESSAGE_SIZE;
+					buf = (char*)buf + MESSAGE_SIZE;
+				}
+				if(m.size > 0){
+					memcpy(m.msg, buf, m.size);
+					err = send(client_fd, &m, m_size, 0);
+					if (err == -1){
+						perror("send");
+						close(client_fd);
+						pthread_exit(NULL);
+					}
+				}
+				buf=buf2;
+			}
+		}
 	}
 }
 
@@ -252,10 +366,11 @@ void * thread_2_handler(void * arg){
 			perror("accept");
 			exit(-1);
 		}
-		
+		pthread_mutex_lock(&m_peers);
 		peers->count++;
 		peers->sock = realloc(peers->sock, peers->count*sizeof(int));
 		peers->sock[peers->count-1]=client_fd;
+		pthread_mutex_unlock(&m_peers);
 		
 		param.sock_id=client_fd;
 		param.peers=peers;

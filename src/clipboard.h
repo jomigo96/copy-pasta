@@ -1,4 +1,4 @@
-#define MESSAGE_SIZE 128
+#define MESSAGE_SIZE 8
 
 #define SOCK_ADDRESS "./sock" 
 
@@ -11,7 +11,8 @@
 #define COPY 1
 #define PASTE 2
 #define REDIRECT 3
-#define NOERROR 4
+#define WAIT 4
+#define NOERROR 5
 
 typedef struct message{
 	
@@ -40,6 +41,8 @@ struct clip_data{
 	
 	void* data[10];
 	size_t size[10];
+	short waiting[10];
+	short writing[10];
 };
 
 
@@ -47,6 +50,7 @@ int clipboard_connect(char * clipboard_dir);
 int clipboard_copy(int clipboard_id, int region, void *buf, size_t count);
 int clipboard_paste(int clipboard_id, int region, void *buf, size_t count);
 void clipboard_close(int clipboard_id);
+int clipboard_wait(int clipboard_id, int region, void* buf, size_t count);
 
 
 
@@ -78,7 +82,7 @@ void * thread_2_handler(void * arg);
 
 
 /*!
- * \brief Remove peer id from the peer vector
+ * \brief Remove peer id from the peers vector
  * 
  * \param peerv Pointer to C_peers structure which stores all the peer 
  * ids 

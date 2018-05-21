@@ -32,7 +32,7 @@ int main(){
 */		
 		while(opt != 0){
 			
-			printf("Copy - 1  Paste - 2   Exit - 0\n");
+			printf("Copy - 1  Paste - 2  Wait - 3  Exit - 0\n");
 			scanf("%d", &opt);
 			while(getchar() != '\n');
 			
@@ -60,6 +60,19 @@ int main(){
 				while(getchar() != '\n')
 					;
 				code=clipboard_paste(fd, entry, dados, size);
+				if(code > 0){
+					printf("Success, received %d bytes\n", code);
+					printf("Message: %s\n",dados);
+				}
+				else
+					printf("Failure\n");
+			}
+			if (opt == 3){
+				printf("Entry: ");
+				scanf("%d", &entry);
+				while(getchar() != '\n')
+					;
+				code=clipboard_wait(fd, entry, dados, size);
 				if(code > 0){
 					printf("Success, received %d bytes\n", code);
 					printf("Message: %s\n",dados);
