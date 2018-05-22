@@ -41,6 +41,8 @@ projeto proposto consistia na implementação do ante-referido
 \textit{clipboard} através de uma biblioteca, uma API e um processo
 local que controlassem o funcionamento do mesmo.
 
+\section{Funcionamento Teórico}
+
 O funcionamento do \textit{clipboard} distribuído é análogo ao
 funcionamento da função de copiar-colar implementada em muitos diferentes
 programas e sistemas. Uma API permite a outras aplicações comunicar com
@@ -53,4 +55,43 @@ sistemas, facilitando assim a comunicação de dados entre estes.
 Cada conjunto de \textit{clipboards} interligados tem espaço para
 armazenamento de dez variáveis diferentes, identificados de 1 a 10.
 
+As várias instâncias de \textit{clipboards} locais mantêm uma hierarquia
+entre si. Quando um \text{clipboard} é iniciado, ou conecta-se a outro ou
+servirá para outras instâncias se conectarem. Neste segundo caso, esta
+primeira instância estará no topo da hierarquia, e quaisquer outras
+instâncias que se conectem estarão um nível abaixo na hierarquia.
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width = 0.4\linewidth]{example-grid-100x100pt}
+	\caption{Esboço da arquitectura de implementação e comunicação.}
+	\label{fig:scheme_main}
+\end{figure}
+
+\begin{figure}[ht]
+	\centering
+	\includegraphics[width = 0.4\linewidth]{example-grid-100x100pt}
+	\caption{Hierarquia de instâncias do \textit{clipboard}.}
+	\label{fig:hierarchy}
+\end{figure}
+
+\section{Implementação}
+
+\section{Conclusão}
+
+\subsection{Correspondência de Critérios}
+
 \end{document}
+
+Notas
+	1 Junho - Submissão no Fénix
+	Relatório -  Véspera da discussão
+	Discussões - Para agendar (meia hora)
+	
+	Critérios de avaliação - No Fénix
+
+	clipboard.h só pode ter AS quatro linhas
+		Se tiver mais serão apagadas
+	
+	Pensem nos erros e resolvam-nos
+		Ou pelo menos reconheçam-nos
