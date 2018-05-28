@@ -4,10 +4,18 @@
 % -- Texto e codificação
 \usepackage[utf8]{inputenc}
 \usepackage[portuguese]{babel}
-\usepackage{lmodern}
-\usepackage[T1]{fontenc}
 \usepackage{microtype}
 \usepackage{xcolor}
+\usepackage{anyfontsize}
+
+% -- Tipo de letra
+\usepackage{heuristica}
+\usepackage[heuristica,vvarbb,bigdelims]{newtxmath}
+\usepackage[T1]{fontenc}
+\renewcommand*\oldstylenums[1]{\textosf{#1}}
+
+%\usepackage{lmodern}
+%\usepackage[T1]{fontenc}
 
 % -- Definir margens do documento
 \usepackage{geometry}
@@ -34,6 +42,7 @@
 \usepackage{amssymb}
 \usepackage{textcomp}
 \usepackage{gensymb}
+\usepackage{cancel}
 
 % -- Referências
 \usepackage{hyperref}

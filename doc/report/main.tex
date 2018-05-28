@@ -11,10 +11,11 @@
 	\begin{center}
 		\vspace{70mm} % --  Espaço em branco
 		\rule{\linewidth}{0.5pt} \\
+		\vspace{2mm}
 		\Huge \textsc{Clipboard Distribuído} \\
 		\rule{\linewidth}{2pt} \\
-		\vspace{10mm} % -- Espaço em branco
-		\LARGE Projecto Final
+		\vspace{8mm} % -- Espaço em branco
+		\LARGE Projeto Final
 		
 		\vspace{\fill} % --  Espaço em branco variável
 		\large
@@ -28,11 +29,11 @@
 		\large Programação de Sistemas
 		
 		\vspace{10mm} % --  Espaço em branco
-		\Large Maio de 2018
+		\Large Junho de 2018
 	\end{center}
 \newpage
 
-\section{Objetivo}
+\section{Introdução}
 
 Para o projeto final da unidade curricular de Programação de Sistemas do
 segundo semestre do ano curricular de 2017/2018 foi desenvolvido e
@@ -40,8 +41,6 @@ implementado um \textit{clipboard} distribuído em C. O objetivo do
 projeto proposto consistia na implementação do ante-referido 
 \textit{clipboard} através de uma biblioteca, uma API e um processo
 local que controlassem o funcionamento do mesmo.
-
-\section{Funcionamento Teórico}
 
 O funcionamento do \textit{clipboard} distribuído é análogo ao
 funcionamento da função de copiar-colar implementada em muitos diferentes
@@ -75,23 +74,24 @@ instâncias que se conectem estarão um nível abaixo na hierarquia.
 	\label{fig:hierarchy}
 \end{figure}
 
-\section{Implementação}
+\section{Arquitectura}
 
-\section{Conclusão}
+\subsection{Protocolo de Comunicação}
 
-\subsection{Correspondência de Critérios}
+\subsection{Fluxo de Tratamento de Pedidos}
+
+\subsubsection{\textit{Copy}}
+
+\subsubsection{\textit{Paste}}
+
+\subsubsection{\textit{Wait}}
+
+\section{Sincronização}
+
+\subsection{Identificação das Regiões Críticas}
+
+\subsection{Implementação de Exclusão Mútua}
+
+\section{Gestão de Recurso de Tratamento de Erros}
 
 \end{document}
-
-Notas
-	1 Junho - Submissão no Fénix
-	Relatório -  Véspera da discussão
-	Discussões - Para agendar (meia hora)
-	
-	Critérios de avaliação - No Fénix
-
-	clipboard.h só pode ter AS quatro linhas
-		Se tiver mais serão apagadas
-	
-	Pensem nos erros e resolvam-nos
-		Ou pelo menos reconheçam-nos
