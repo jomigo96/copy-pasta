@@ -12,6 +12,7 @@ Daniel de Schiffart 81479
  - app_teste.c
  - app_teste2.c
  - Makefile
+ - grade.pdf
 
 ## Instalação
 Para compilar todos os ficheiros usar: 
