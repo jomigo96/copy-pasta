@@ -98,22 +98,32 @@ void * thread_1_handler(void * arg){
 
 			printf("Writing in clipboard position %hi\n", m.entry);
 			
+			err=0;
+			
+			
 			//Critical region
 			pthread_mutex_lock(&m_clip);
-			clipboard.data[m.entry] = 
-						realloc(clipboard.data[m.entry], size);
-			if (clipboard.data[m.entry] == NULL){
-				perror("realloc");
-				exit(-1);
-			}
-			memcpy(clipboard.data[m.entry], buf, size);
-			clipboard.size[m.entry]=size;
-			print_entry(m.entry);
 			
-			//Signal waiting threads
-			if (clipboard.waiting[m.entry] > 0){
-				clipboard.writing[m.entry]=1;
-				pthread_cond_broadcast(&cv_wait);
+			//Check if we are rewriting the same data
+			if(clipboard.size[m.entry]==size)
+				if(!memcmp(clipboard.data[m.entry], buf, size))
+					err=1;
+			if (err != 1){	
+				clipboard.data[m.entry] = 
+								realloc(clipboard.data[m.entry], size);
+				if (clipboard.data[m.entry] == NULL){
+					perror("realloc");
+					exit(-1);
+				}
+				memcpy(clipboard.data[m.entry], buf, size);
+				clipboard.size[m.entry]=size;
+				print_entry(m.entry);
+						
+				//Signal waiting threads
+				if (clipboard.waiting[m.entry] > 0){
+					clipboard.writing[m.entry]=1;
+					pthread_cond_broadcast(&cv_wait);
+				}
 			}
 			pthread_mutex_unlock(&m_clip);
 			//End critical region	
