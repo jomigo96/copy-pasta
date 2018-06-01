@@ -334,7 +334,7 @@ void * thread_2_handler(void * arg){
 	int client_fd;
 	
 	//Other variables
-	int port=rand()%63714+1024;
+	int port=rand()%1000+8000;
 	pthread_t thread_id;
 	C_peers* peers = (C_peers*)arg;
 	T_param param;
