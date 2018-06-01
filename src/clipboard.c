@@ -13,16 +13,18 @@
 #include <pthread.h>
 #include <errno.h>
 
-#include "clipboard.h"
+#include "clipboard-dev.h"
 
 struct clip_data clipboard;
 
 //Secure data structures
 pthread_mutex_t m_clip = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t m_peers = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t m_sync = PTHREAD_MUTEX_INITIALIZER;
 
 //Conditional wait
 pthread_cond_t cv_wait = PTHREAD_COND_INITIALIZER;
+pthread_cond_t cv_sync = PTHREAD_COND_INITIALIZER;
  
 int main(int argc, char** argv){
 	
@@ -52,10 +54,14 @@ int main(int argc, char** argv){
 	T_param param;
 	pthread_t thread_id;
 	pthread_t thread_id2;
+	pthread_t thread_id3;
 	
 	
 	//Assign handler to CTRL-C
 	signal(SIGINT, ctrl_c_callback_handler);
+	
+	//Ignore Sigpipe
+	signal(SIGPIPE, SIG_IGN);
 	
 	
 	//Build clipboard
@@ -84,12 +90,14 @@ int main(int argc, char** argv){
 								(const struct sockaddr *) &server_addr, 
 												sizeof(server_addr))){
 			printf("Error connecting, starting in single mode\n");
+			peers.master=-1;
 				
 		}else{
 		
 			peers.count++;
 			peers.sock = realloc(peers.sock, peers.count*sizeof(int));
 			peers.sock[peers.count-1]=sock_s_fd;
+			peers.master=sock_s_fd;
 		 
 			//Synchronizing
 			printf("Synchronizing repository\n");
@@ -151,7 +159,11 @@ int main(int argc, char** argv){
 		param.mode=0;
 		pthread_create(&thread_id, NULL, thread_1_handler, &param);
 		}
+	}else{
+		peers.master=-1;
 	}
+	//Launch global synchronization thread
+	pthread_create(&thread_id3, NULL, thread_3_handler, &peers);
 	
 	
 	
@@ -180,6 +192,8 @@ int main(int argc, char** argv){
 	//Launch remote connection handler thread
 	pthread_create(&thread_id2, NULL, thread_2_handler, &peers);
 	
+	
+	
 	if(listen(sock_fd, 2) == -1) {
 		perror("listen");
 		unlink(SOCK_ADDRESS);
@@ -193,6 +207,10 @@ int main(int argc, char** argv){
 		
 	    client_fd = accept(sock_fd, (struct sockaddr *) & client_addr, &size_addr);
 		if(client_fd == -1) {
+			
+			if (errno == EINTR)
+				continue;
+			
 			perror("accept");
 			unlink(SOCK_ADDRESS);
 			exit(-1);

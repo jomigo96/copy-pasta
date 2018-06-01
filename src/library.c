@@ -11,6 +11,7 @@
 #include <math.h>
 
 #include "clipboard.h"
+#include "clipboard-dev.h"
 
 int clipboard_connect(char * clipboard_dir){
 
@@ -23,12 +24,12 @@ int clipboard_connect(char * clipboard_dir){
 		return -1;
 	}
 
-	printf(" socket created \n");
 
 	client_addr.sun_family = AF_UNIX;
 	sprintf(client_addr.sun_path, "%ssocket_%d", clipboard_dir ,getpid());
 	server_addr.sun_family = AF_UNIX;
-	strcpy(server_addr.sun_path, SOCK_ADDRESS);
+	sprintf(server_addr.sun_path, "%s%s", clipboard_dir, "sock");
+	
 
 	int err_c = connect(sock_fd, (const struct sockaddr *) &server_addr, 
 							sizeof(server_addr));

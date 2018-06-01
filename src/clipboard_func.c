@@ -1,4 +1,4 @@
-#include "clipboard.h"
+#include "clipboard-dev.h"
 
 #include <fcntl.h>
 #include <stdlib.h>
@@ -10,12 +10,15 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <errno.h>
+#include <sys/wait.h>
 
 extern struct clip_data clipboard;
 extern pthread_mutex_t m_clip;
 extern pthread_mutex_t m_peers;
 extern pthread_cond_t cv_copy;
 extern pthread_cond_t cv_wait;
+extern pthread_cond_t cv_sync;
+extern pthread_mutex_t m_sync;
 
 void * thread_1_handler(void * arg){
 	
@@ -363,6 +366,9 @@ void * thread_2_handler(void * arg){
 	
 		client_fd = accept(sock_fd, (struct sockaddr *) & client_addr, &size_addr);
 		if(client_fd == -1) {
+			if (errno == EINTR)
+				continue;
+				
 			perror("accept");
 			exit(-1);
 		}
@@ -377,6 +383,91 @@ void * thread_2_handler(void * arg){
 		param.mode=0;
 		
 		pthread_create(&thread_id, NULL, thread_1_handler, &param);
+	}
+}
+
+void * thread_3_handler(void * arg){
+	
+	C_peers* peers = (C_peers*)arg;
+	int i, j;
+	Message m;
+	void* buf=NULL;
+	void* buf2=NULL;
+	size_t size;
+	const size_t m_size = sizeof(Message);
+	int err;
+	
+	signal(SIGALARM, alarm_done);
+	
+	
+	while(1){
+		pthread_mutex_lock(&m_peers);		
+		do{
+			alarm(30);
+			pthread_cond_wait(&cv_sync, &m_peers);
+		}while (peers->master != -1);
+		
+		printf("Timed synchronization\n");
+		
+		// Replicate everything to other clipboards - critical region
+		if(peers->count > 0){
+			m.flag = REDIRECT;
+			
+			for(j=0; j<10; j++){
+				
+				pthread_mutex_lock(&m_clip);
+				size=clipboard.size[j];	
+				if(size!=0){
+					buf2=realloc(buf2, size);
+					if(buf2==NULL){
+						perror("realloc");
+						exit(-1);
+					}
+					memcpy(buf2, clipboard.data[j], size);
+				}
+				pthread_mutex_unlock(&m_clip);
+				
+				if(size == 0)
+					continue;
+				
+				for(i=0; i<peers->count; i++){
+							
+					buf=buf2;
+					m.size=size;
+					m.entry=j;
+							
+					while (m.size > MESSAGE_SIZE){
+								
+							memcpy(m.msg, buf, MESSAGE_SIZE);
+								
+							err = send(peers->sock[i], &m,m_size,0);
+							if (err == -1){
+								perror("send");
+								remove_fd(peers, peers->sock[i]);
+								close(peers->sock[i]);
+								i--;
+								continue;
+							}
+							
+							m.size = m.size - MESSAGE_SIZE;
+							buf = (char*)buf + MESSAGE_SIZE;
+								
+					}
+					if(m.size > 0){
+						memcpy(m.msg, buf, m.size);
+						err = send(peers->sock[i], &m, m_size, 0);
+						if (err == -1){
+							perror("send");
+							remove_fd(peers, peers->sock[i]);
+							close(peers->sock[i]);
+							i--;
+							continue;
+						}
+					}
+				}
+			}
+		}
+		pthread_mutex_unlock(&m_peers);
 	}
 }
 
@@ -418,6 +509,11 @@ void remove_fd(C_peers * peerv, int fd){
 	free(peerv->sock);
 	peerv->count--;
 	peerv->sock = new;
+	if(peerv->master == fd){
+		peerv->master = -1;
+	}
+	
+	
 }
 
 void ctrl_c_callback_handler(int signum){
@@ -431,4 +527,13 @@ void ctrl_c_callback_handler(int signum){
 		free(clipboard.data[i]);
 	
 	exit(0);
+}
+
+void alarm_done(int signum){
+	
+	
+	pthread_mutex_lock(&m_peers);
+	pthread_cond_broadcast(&cv_sync);
+	pthread_mutex_unlock(&m_peers);
+	signal(SIGALARM, alarm_done);
 }
