@@ -3,6 +3,8 @@
 
 \input{preamble}
 
+\usepackage{lipsum}
+
 \begin{document}
 
 \thispagestyle{empty}
@@ -33,6 +35,10 @@
 	\end{center}
 \newpage
 
+\tableofcontents
+
+\newpage
+
 \section{Introdução}
 
 Para o projeto final da unidade curricular de Programação de Sistemas do
@@ -60,38 +66,481 @@ servirá para outras instâncias se conectarem. Neste segundo caso, esta
 primeira instância estará no topo da hierarquia, e quaisquer outras
 instâncias que se conectem estarão um nível abaixo na hierarquia.
 
+Para a comunicação entre \textit{clipboards} são usados \textit{sockets} de domínio Internet, enquanto que para a comunicação com clientes são usados sockets de domínio UNIX.
+
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width = 0.4\linewidth]{example-grid-100x100pt}
+	\scalebox{0.8}{
+    \begin{tikzpicture}[clipboard/.style = {rectangle, draw, inner sep = 2cm},
+    					app/.style = {rectangle, draw, inner sep = 3mm},
+    					socketin/.style = {rectangle, color = black!70!green},
+    					pathstyle/.style = {->},
+    					pathlabel/.style ={color = black!40!blue}]
+    	% Start of Clipboard 1
+    	\node (app1) at (0,0) [app] {App 1};
+    	\node (app2) [app, right = 1.7cm of app1] {App 2};
+    	\node (t2app1) [socketin, below = 3cm of app1] {\texttt{thread\_1}};
+    	\node (t2app2) [socketin, below = 3cm of app2] {\texttt{thread\_1}};
+    	\draw [pathstyle] (app1) to [bend right = 20] node [auto,swap,align = right, pathlabel] {\footnotesize \ttfamily copy \\ \footnotesize \ttfamily paste \\ \footnotesize \ttfamily wait \\ \footnotesize \ttfamily disconnect} (t2app1);
+    	\draw [pathstyle] (t2app1) to [bend right = 20] (app1);
+    	\draw [pathstyle] (app2) to [bend right = 20] (t2app2);
+    	\draw [pathstyle] (t2app2) to [bend right = 20] (app2);
+    	\path (t2app1.north) to node (clip1) [auto, swap, clipboard] {\LARGE Clipboard 1} (t2app2.north);
+    	\path (clip1.north east) to node (clip1in1) [auto, swap, align = right, yshift = 0.5cm, socketin] {\texttt{thread\_1}} node (clip1in3) [auto, swap, align = right, yshift = -0.5cm, socketin] {\texttt{thread\_3}} (clip1.south east);
+    	% Start of Clipboard 2
+    	\node (app3) at (10,0) [app] {App 3};
+    	\node (app4) [app, right = 1.7cm of app3] {App 4};
+    	\node (t2app3) [socketin, below = 3cm of app3] {\texttt{thread\_1}};
+    	\node (t2app4) [socketin, below = 3cm of app4] {\texttt{thread\_1}};
+    	\draw [pathstyle] (app3) to [bend right = 20] (t2app3);
+    	\draw [pathstyle] (t2app3) to [bend right = 20] (app3);
+    	\draw [pathstyle] (app4) to [bend right = 20] (t2app4);
+    	\draw [pathstyle] (t2app4) to [bend right = 20] (app4);
+    	\path (t2app3.north) to node (clip2) [auto, swap, clipboard] {\LARGE Clipboard 2} (t2app4.north);
+    	\path (clip2.north west) to node (clip2in1) [auto, align = left, yshift = 0.5cm, socketin] {\texttt{thread\_1}} (clip2.south west);
+    	% Paths in between
+    	\draw [pathstyle] (clip1in1.north east) -- node [auto, align = center, pathlabel] {\ttfamily \footnotesize paste \\ \ttfamily \footnotesize redirect} (clip2in1.north west);
+    	\draw [pathstyle] (clip2in1) -- (clip1in1);
+    	\draw [pathstyle] (clip1in3.east) -- node [auto, swap, pathlabel] {\ttfamily \footnotesize redirect} (clip2in1);
+    \end{tikzpicture}}
 	\caption{Esboço da arquitectura de implementação e comunicação.}
 	\label{fig:scheme_main}
 \end{figure}
 
 \begin{figure}[ht]
 	\centering
-	\includegraphics[width = 0.4\linewidth]{example-grid-100x100pt}
+    \begin{tikzpicture}[	clipinstance/.style = {circle,draw,
+                                minimum width = 1.2cm},
+    					    patharrow/.style = {-{Stealth[]}}]
+    	\node (node1) at (0,0) [clipinstance] {\Large $1$};
+    	\node (node2) [clipinstance, below right = 1.4cm and 0.8 cm of node1] {\Large $2$};
+    	\node (node3) [clipinstance, below left = 1.4cm and 0.8 cm of node1] {\Large $3$};
+    	\node (node4) [clipinstance, below right = 1.4cm and 0.8 cm of node2] {\Large $4$};
+    	\node (node5) at (5,0) [clipinstance] {\Large $5$};
+    	\node (node6) [clipinstance, below right = 1.4cm and 0.8 cm of node5] {\Large $6$};
+    	\draw [patharrow] (node4) -- (node2) edge (node1);
+    	\draw [patharrow] (node3) -- (node1);
+    	\draw [patharrow] (node6) -- (node5);
+    \end{tikzpicture}
 	\caption{Hierarquia de instâncias do \textit{clipboard}.}
 	\label{fig:hierarchy}
 \end{figure}
 
-\section{Arquitectura}
+\section{Arquitetura}
+
+O programa desenvolvido encontra-se dividido num conjunto de cinco ficheiros
+de código fonte, mais dois ficheiros adicionais desenvolvidos para duas
+aplicações de teste. São estes ficheiros
+\begin{itemize} \setlength{\itemsep}{0pt}
+    \item \texttt{clipboard.c} -- O núcleo do \textit{clipboard}.
+        Contém o código para a função principal \mintinline{c}{int main} e
+        a \textit{thread} principal do programa, assim como a inclusão das
+        bibliotecas utilizadas. \\
+    \item \texttt{clipboard.h} e \texttt{clipboard-dev.h} -- Incluem a 
+        declaração das funções e todos os macros utilizados.
+        O primeiro ficheiro inclui as funções que compõem a API para
+        implementação em outras aplicações, e o segundo ficheiro contém as
+        declarações das funções restantes. \\
+    \item \texttt{library.c} -- Contém o código das funções pertencentes à
+        API, declaradas em \texttt{clipboard.h}.
+    \item \texttt{clipboard\_func.c} -- Código auxiliar ao ficheiro
+        \texttt{clipboard.c}. Inclui as funções correspondentes às
+        \textit{threads} e ao tratamento de sinais, assim como outras funções
+        utilizadas.
+    \item \texttt{app\_teste.c} e \texttt{app\_teste2.c} -- Código
+        correspondente às duas aplicações de teste referidas.
+\end{itemize}
+
+\subsection{Estruturas de dados}
+\label{sec:estruturas}
+
+Os dados são armazenados numa estrutura do tipo \mintinline{c}{struct clip_data}, declarada global. De \texttt{clipboard-dev.h}:
+\begin{minted}[linenos, firstnumber = 43, frame = leftline]{c}
+struct clip_data{
+	
+	void* data[10];
+	size_t size[10];
+	short waiting[10];
+	short writing[10];
+};
+\end{minted}
+Os últimos dois campos são usados para gerir os pedidos de \mintinline{c}{clipboard_wait()}.
+
+Os \textit{peers}, têm o seu \textit{file descriptor} guardado num vetor dinâmico implementado com \mintinline{c}{struct clip_peers}.
+\begin{minted}[linenos, firstnumber = 28, frame = leftline]{c}
+typedef struct clip_peers{
+	
+	int count;
+	int * sock;
+	int master;
+}C_peers;
+\end{minted}
+Nesta estrutura, guarda-se ainda o \texttt{fd} do \textit{master}, ou seja, o \textit{clipboard} conectado com a hierarquia mais alta, que é usado na sincronização global. 
+Seguindo o exemplo da figura \ref{fig:hierarchy}, \texttt{master} do clipboard 4 vai guardar o \texttt{fd} de 2, e o \texttt{master} do clipboard 1 vai guardar $-1$.
+
+\subsection{\textit{Threads}}
+
+Cada instância de um \textit{clipboard} usa três tipos de \textit{threads} diferentes, mais o \texttt{main} em si, para executar todos os pedidos de forma eficiente e rápida.
+
+\subsubsection{\texttt{main}} 
+A função \texttt{main} efetua o arranque, que consiste na inicialização do \textit{clipboard}, sincronização deste (caso em modo conectado), lançamento das outras \textit{threads} relevantes, e de seguida entra num ciclo infinito para aceitar ligações com aplicações.
+
+
+\subsubsection{\texttt{thread\_1}}
+Serviço para aplicações ou outros \textit{clipboards}.
+Esta \textit{thread} é lançada para cada nova conexão que é efetuada, e faz \textit{exit} quando esta é interrompida. 
+
+As funcionalidades são:
+\begin{itemize} \setlength{\itemsep}{0pt}
+    \item Desconectar. \\
+    \item \textit{Copy} -- escrever numa posição local, e reencaminhar para todos os \textit{peers} ligados a esta instância. \\
+    \item \textit{Paste} -- devolver uma posição. \\
+    \item \textit{Wait} -- esperar até uma posição ser alterada e depois devolve-la. \\
+    \item \textit{Redirect} -- idêntico ao \textit{copy}, mas específico para usar com outros \textit{clipboards}.
+\end{itemize}
+
+\subsubsection{\texttt{thread\_2}}
+Aceitação de ligações com outros \textit{clipboards}. Uma e uma só \textit{thread} deste tipo está a correr, em ciclo infinito, para aceitar ligações com \textit{peers}, lançando depois uma \texttt{thread\_1}. 
+Também é aqui criada a socket de domínio \texttt{AF\_INET}, e imprimido o porto através o qual outro \textit{clipboard} se pode conectar.
+
+\subsubsection{\texttt{thread\_3}}
+
+Sincronização global. Igualmente à \texttt{thread\_2}, uma instância desta \textit{thread} corre por cada \textit{clipboard}. Caso o \textit{clipboard} seja o topo de uma árvore, a cada 30 segundos ocorre uma sincronização, de forma que todos os dados são replicados para os \textit{peers} a ele ligados. 
+
+\subsection{API}
+
+As funções referidas pertencentes à API são cinco e estão declaradas no
+ficheiro \texttt{clipboard.h} da forma
+\begin{minted}[linenos, firstnumber = 3]{c}
+int clipboard_connect(char * clipboard_dir);
+int clipboard_copy(int clipboard_id, int region, void *buf, size_t count);
+int clipboard_paste(int clipboard_id, int region, void *buf, size_t count);
+void clipboard_close(int clipboard_id);
+int clipboard_wait(int clipboard_id, int region, void* buf, size_t count);
+\end{minted}
 
 \subsection{Protocolo de Comunicação}
 
+A comunicação entre instâncias separadas do \textit{clipboard} é realizada
+com recurso a \textit{sockets} UNIX do tipo \texttt{SOCK\_STREAM}.
+
+O uso dos sockets é feito usando a estrutura \mintinline{c}{struct message} declarada em \texttt{clipboard-dev.h} como:
+\begin{minted}[linenos, firstnumber = 19, frame = leftline]{c}
+typedef struct message{
+	
+	short entry; 
+	char msg[MESSAGE_SIZE];
+	size_t size; 
+	short flag; 
+	
+}Message;
+\end{minted}
+O macro \texttt{MESSAGE\_SIZE} tem o valor de 256 (bytes), que deverá assegurar a maioria dos pedidos ao sistema com apenas uma mensagem, para o uso típico deste. 
+Caso isto se verifique, toda a informação necessária é transmitida em apenas uma mensagem: \texttt{entry} contêm a posição do \textit{clipboard} em questão, \texttt{size} o tamanho da mensagem, e \texttt{flag} é um código que distingue as operações a fazer.
+Caso a mensagem tenha mais de \texttt{MESSAGE\_SIZE} bytes, o campo \texttt{size} passa a conter o tamanho dos dados que faltam receber, estes são divididos em partes, e enviados consecutivamente, como exemplificado neste segmento de código, proveniente da função \mintinline{c}{clipboard_copy}:
+\begin{minted}[linenos, firstnumber = 61, frame = leftline]{c}
+	while (count > MESSAGE_SIZE){
+	
+		m.size=count;
+	
+		memcpy(m.msg, buf, MESSAGE_SIZE);
+		
+		err = send(clipboard_id, &m, sizeof(Message),0);
+\end{minted}
+\begin{minted}[linenos, firstnumber = 72, frame = leftline]{c}
+		sent+=MESSAGE_SIZE;
+		buf = (char*)buf + MESSAGE_SIZE;
+		count = count - MESSAGE_SIZE;
+	}
+	
+	if (count > 0){
+		m.size = count;
+		memcpy(m.msg, buf, count);
+		err = send(clipboard_id, &m, sizeof(Message),0);
+\end{minted}
+\begin{minted}[linenos, firstnumber = 85, frame = leftline]{c}
+		sent+=count;
+	}
+\end{minted}
+Do lado do receptor, a estrutura é idêntica.
+
+
+
 \subsection{Fluxo de Tratamento de Pedidos}
+
+A todas estas rotinas, acrescentam-se operações de alocação de memória e tratamento de erros.
 
 \subsubsection{\textit{Copy}}
 
+A função de \textit{copy} do \textit{clipboard} recebe uma mensagem e
+sincroniza-a com todas as instâncias do \textit{clipboard} a que está
+conectada.
+
+Primeiro, os dados são totalmente copiados para um \textit{buffer} local, seguindo o protocolo de comunicação já descrito.
+
+De seguida, os dados são inseridos na estrutura de memória do \textit{clipboard}, e verifica-se se a entrada está marcada como em espera, sendo efetuado um \mintinline{c}{pthread_cond_broadcast()} caso afirmativo.
+
+Finalmente, retorna-se uma mensagem a reportar erros, e os dados são reencaminhados para todos os \textit{peers}.
+
 \subsubsection{\textit{Paste}}
+
+A função de \textit{paste} devolve a totalidade dos dados de uma entrada.
+
+Começa por copiar os dados da entrada para um \textit{buffer} local, com o caso excecional de a entrada estar vazia.
+
+De seguida, são enviados de acordo com o protocolo de comunicação.
 
 \subsubsection{\textit{Wait}}
 
-\section{Sincronização}
+A função de \textit{wait} espera até uma entrada ser alterada para de seguida devolver os novos conteúdos.
 
+A espera é sinalizada através de um campo da estrutura de dados do \textit{clipboard}, e entra-se em espera passiva, através de uma variável condicional.
+
+Quando sinalizada de outra instrução de \textit{copy}, passa a executar como um \textit{paste}.
+
+
+\section{Sincronização}
 \subsection{Identificação das Regiões Críticas}
 
-\subsection{Implementação de Exclusão Mútua}
+As regiões críticas a proteger são aquelas que procuram ler/escrever nas estruturas de dados descritas na secção \ref{sec:estruturas}. 
 
-\section{Gestão de Recurso de Tratamento de Erros}
+No caso de \mintinline{c}{struct clip_data}, os acessos ocorrem sempre que se faz um \textit{copy/redirect}, \textit{paste}, \textit{wait}, ou operação equivalente. 
+A exclusão é efetuada com \texttt{mutexes}, de maneira que as leituras também bloqueiam os acessos.
+Isto permite que tanto a escrita como a leitura sejam essencialmente atómicas, não havendo mistura de dados.
+Como são usados \textit{buffers} locais para operações com os dados, a zona crítica pode ser restrita apenas a uma operação de alocamento de memória e de cópia.
+
+No caso de \mintinline{c}{struct clip_peers}, os acessos ocorrem apenas quando há o reencaminhamento de dados, quer originado por um \textit{copy/redirect} ou por uma sincronização periódica, ou quando se insere ou remove um valor no vetor dinâmico. 
+
+\subsection{Implementação de Exclusão Mútua}
+De \texttt{clipboard.c}: 
+\begin{minted}[linenos, firstnumber = 20, frame = leftline]{c}
+//Secure data structures
+pthread_mutex_t m_clip = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t m_peers = PTHREAD_MUTEX_INITIALIZER;
+\end{minted}
+\subsubsection{\texttt{clip\_data}}
+
+A exclusão mútua desta estrutura é feita usando o \texttt{mutex} \texttt{m\_clip}. De \texttt{clipboard\_func.c}:
+\begin{minted}[linenos, firstnumber = 104, frame = leftline]{c}
+//Critical region
+pthread_mutex_lock(&m_clip);
+			
+//Check if we are rewriting the same data
+if(clipboard.size[m.entry]==size)
+	if(!memcmp(clipboard.data[m.entry], buf, size))
+		err=1;
+if (err != 1){	
+	clipboard.data[m.entry] = 
+			realloc(clipboard.data[m.entry], size);					
+	if (clipboard.data[m.entry] == NULL){
+		perror("realloc");
+		exit(-1);
+	}
+	memcpy(clipboard.data[m.entry], buf, size);
+	clipboard.size[m.entry]=size;
+	print_entry(m.entry);
+						
+	//Signal waiting threads
+	if (clipboard.waiting[m.entry] > 0){
+		clipboard.writing[m.entry]=1;
+		pthread_cond_broadcast(&cv_wait);
+	}
+}
+pthread_mutex_unlock(&m_clip);
+//End critical region	
+\end{minted}
+
+Este excerto é retirado de uma operação de \textit{copy}, onde os novos dados já estão guardados em \texttt{buf}. A zona crítica consiste numa alocação de memória, uma cópia, e uma sinalização a \textit{threads} em espera passiva. No caso de uma leitura, é ainda mais simples:
+
+\begin{minted}[linenos, firstnumber = 202, frame = leftline]{c}
+//Critical region
+pthread_mutex_lock(&m_clip);
+size=clipboard.size[m.entry];
+if (size == 0){
+	pthread_mutex_unlock(&m_clip);
+\end{minted}
+\begin{minted}[linenos, firstnumber = 219, frame = leftline]{c}
+	continue;
+}else{
+	buf=realloc(buf, size);
+	if(buf==NULL){
+		perror("realloc");
+		exit(-1);
+	}
+	memcpy(buf, clipboard.data[m.entry], size);		
+	pthread_mutex_unlock(&m_clip);
+}
+//end critical region
+\end{minted}
+
+\subsubsection{\texttt{clip\_peers}}
+
+Neste caso, a exclusão é mais apertada, visto querermos garantir que o protocolo de comunicação com várias mensagens não seja violado. Desta maneira, este vetor dinâmico é bloqueado durante toda a transmissão de dados entre \textit{peers}, para além das operações de escrita e leitura.
+\begin{minted}[linenos, firstnumber = 147, frame = leftline]{c}
+// Replicate to other clipboards - critical region
+pthread_mutex_lock(&m_peers);
+if(peers->count > 0){
+	m.flag = REDIRECT;
+	buf2=buf;
+				
+	for(i=0; i<peers->count; i++){
+					
+		if (client_fd != peers->sock[i]){
+			printf("Sending to peer with fd %d\n", 
+				peers->sock[i]);
+						
+			buf=buf2;
+			m.size=size;
+\end{minted}
+Protocolo de comunicação
+\begin{minted}[linenos, firstnumber = 191, frame = leftline]{c}
+		}
+	}
+	buf=buf2;
+}
+//End critical region
+pthread_mutex_unlock(&m_peers);
+\end{minted}
+
+A exclusão é implementada também quando pretendemos remover um \textit{peer} do vector, como exemplificado aqui.
+\begin{minted}[linenos, firstnumber = 43, frame = leftline]{c}
+err = recv(client_fd, &m, m_size, 0);
+if(err <= 0){
+	printf("Disconnected\n");
+	close(client_fd);
+	if(mode==PEER_SERVICE){
+		pthread_mutex_lock(&m_peers);
+		remove_fd(peers, client_fd);
+		pthread_mutex_unlock(&m_peers);
+	}
+	pthread_exit(NULL);
+}
+\end{minted}
+Também de maneira idêntica quando se acrescenta um elemento, na \texttt{thread\_2}.
+
+
+\subsection{Sincronização global}
+
+A sincronização global é aplicada para garantir que, na maioria do tempo, uma árvore de \textit{clipboards} contém a mesma informação. 
+Imaginemos que no exemplo da figura \ref{fig:hierarchy}, executamos um pedido de \textit{copy} nos \textit{clipboards} 3 e 4, ao mesmo tempo. O sistema propaga as mensagens em ambas as direções na cadeia, e no final, uma metade pode ter dados diferentes da outra.
+
+A solução implementada é a sincronização completa a cada 30 segundos, iniciada neste caso pelo \textit{clipboard} 1. 
+Para tal, a \texttt{thread\_3} é acordada por um \texttt{SIGALARM}, verifica se é o topo da árvore e envia os dados.
+O código relevante é todo o de \mintinline{c}{thread_3_handler()}. 
+
+
+\section{Gestão de Recurso e Tratamento de Erros}
+
+\subsection{Memória dinâmica}
+
+Os arrays dinâmicos usados são operados com a função \mintinline{c}{realloc()}, de maneira que a memória usada é sempre a mínima possível.
+
+Em caso de terminação do programa com \texttt{CTRL-C}, as posições do clipboard são igualmente libertadas. 
+Contudo, os \textit{buffers} locais a algumas \textit{threads} não são, temos \textit{memory leak}.
+
+\subsection{Outros recursos}
+
+Os \textit{file descriptors} são libertados com \mintinline{c}{close()} sempre que é detetado que a ligação foi interrompida do outro lado, ou há um pedido de desconexão. 
+
+Para as mesmas condições, as instâncias de \texttt{thread\_1} são terminadas com \mintinline{c}{pthread_exit()}, libertando os respetivos recursos. 
+As restantes \textit{threads} são suposto correrem durante todo o uso do sistema, logo são terminadas quando o programa é terminado.
+
+
+\subsection{Tratamento de erros}
+
+Em muitos casos, usam-se funções ou \textit{system calls} cujo sucesso depende de aplicações não necessariamente confiáveis quanto à sua robustez, ou de processos a correr noutra máquina. 
+Desta forma, procura-se que os erros esperados não afetem o sistema de forma significativa. 
+
+\subsubsection{\textit{Sockets}}
+
+A comunicação entre processos é feita com \textit{sockets}, usando as funções \mintinline{c}{send()} e \mintinline{c}{recv()}. 
+O valor de retorno destas funções indica se houve um erro, e o procedimento adotado é, quando isto acontece, interromper a ligação com o cliente/peer, evidentemente não completando o seu pedido, e sair em ordem invocando \mintinline{c}{close()} e \mintinline{c}{pthread-exit()}.
+A API foi usa o mesmo conceito, mas não fecha a ligação, passando essa decisão à aplicação através do valor de retorno.
+
+Para o caso do \mintinline{c}{send()}, é necessário desativar o sinal \texttt{SIGPIPE}, o que é aceitável visto protegermos todas as invocações desta função. Como exemplo, de \texttt{clipboard\_func.c}:
+
+\begin{minted}[linenos, firstnumber = 167, frame = leftline]{c}
+err = send(peers->sock[i], &m,m_size,0);
+if (err == -1){
+	perror("send");
+	remove_fd(peers, peers->sock[i]);
+	close(peers->sock[i]);
+	i--;
+	continue;
+}
+\end{minted}
+
+Outro exemplo é o caso do \mintinline{c}{accept()} ser terminado devido ao \texttt{SIGALARM}. Quando este é o caso, simplesmente voltamos a invocar esta função.
+\begin{minted}[linenos, firstnumber = 381, frame = leftline]{c}
+client_fd = accept(sock_fd, (struct sockaddr *) & client_addr, &size_addr);
+if(client_fd == -1) {
+	if (errno == EINTR)
+		continue;
+				
+	perror("accept");
+	exit(-1);
+}
+\end{minted}
+
+No caso do \mintinline{c}{bind()}, faz-se \mintinline{c}{unlink()} ao endereço e repete-se a chamada. \texttt{clipboard.c}:
+\begin{minted}[linenos, firstnumber = 180, frame = leftline]{c}
+err = bind(sock_fd, (struct sockaddr *)&local_addr, sizeof(local_addr));
+if(err == -1) {
+	unlink(SOCK_ADDRESS);
+	printf("Unlinked previous address.\n");
+	err = bind(sock_fd, (struct sockaddr *)&local_addr, sizeof(local_addr));
+	if(err == -1) {
+		perror("bind");
+		exit(-1);
+	}
+}
+\end{minted}
+
+Outros erros ocorridos na preparação dos \textit{sockets} são reportados e o programa termina.
+
+\subsubsection{Outros erros}
+
+O programa testa os valores de retorno das chamadas de \mintinline{c}{realloc()}, terminando em caso de erro.
+
 
 \end{document}
+
+
+
+%-------------------------------------------
+%Não sei se isto se adequa a esta parte
+%-------------------------------------------
+\small
+Como exemplo utilizaremos a função \texttt{clipboard\_connect}. Uma aplicação
+desenvolvida começaria por invocar a função \texttt{clipboard\_connect}, que
+tentará conectar com uma instância local do \textit{clipboard}. Dentro do
+\textit{clipboard}, o pedido de conexão é recebido pela
+\texttt{thread\_2\_handler}, e devolvido à função \texttt{thread\_1\_handler}
+com uma variável do tipo \texttt{T\_param} (um \texttt{struct} pré-definido),
+que contém os dados necessários. Este processo encontra-se representado pelas
+linhas do ficheiro \texttt{clipboard\_func.c} que se encontram abaixo.
+\begin{minted}[linenos, firstnumber = 353, frame = leftline]{c}
+    sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+\end{minted}
+\begin{minted}[linenos, firstnumber = 359, frame = leftline]{c}
+    local_addr.sin_family = AF_INET;
+    local_addr.sin_port = htons(port);
+    local_addr.sin_addr.s_addr= INADDR_ANY;
+    err = bind(sock_fd, (struct sockaddr *)&local_addr, sizeof(local_addr));
+\end{minted}
+\begin{minted}[linenos, firstnumber = 369, frame = leftline]{c}
+    err = listen(sock_fd, 2);
+\end{minted}
+\begin{minted}[linenos, firstnumber = 377, frame = leftline]{c}
+    client_fd = accept(sock_fd, (struct sockaddr *) & client_addr, &size_addr);
+\end{minted}
+\begin{minted}[linenos, firstnumber = 391, frame = leftline]{c}
+		param.sock_id=client_fd;
+		param.peers=peers;
+		param.mode=0;
+		
+		pthread_create(&thread_id, NULL, thread_1_handler, &param);
+\end{minted}
+
+A \textit{thread} \texttt{thread\_1\_handler} será mais abaixo detalhada.
+\normalsize

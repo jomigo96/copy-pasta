@@ -1,0 +1,14 @@
+*.o
+*.*~
+*.swp
+*.aux
+*.log
+*.out
+doc/report/*.pdf
+*.synctex.gz
+src/app_teste
+src/app_teste2
+src/clipboard
+*.so
+*.toc
+doc/report/_minted-main/
