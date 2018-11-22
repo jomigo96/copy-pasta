@@ -274,13 +274,16 @@ void * thread_1_handler(void * arg){
 			pthread_mutex_lock(&m_clip);
 			clipboard.waiting[m.entry]++;
 			
+			//printf("Is the flag active? %d \n", clipboard.writing[m.entry] );
+			
 			while (clipboard.writing[m.entry] != 1){
 				pthread_cond_wait(&cv_wait, &m_clip);
 			}
 			
 			size = clipboard.size[m.entry];
+			clipboard.waiting[m.entry]--;
 			if (size == 0){
-				if(0 == (clipboard.waiting[m.entry]--))
+				if(clipboard.waiting[m.entry] == 0)
 					clipboard.writing[m.entry]=0;
 				pthread_mutex_unlock(&m_clip);
 				m.flag = NOERROR;
@@ -295,7 +298,8 @@ void * thread_1_handler(void * arg){
 				buf = realloc(buf, size);
 				memcpy(buf, clipboard.data[m.entry], size);
 				
-				if(0 == (clipboard.waiting[m.entry]--))
+				
+				if(clipboard.waiting[m.entry] == 0)
 					clipboard.writing[m.entry]=0;
 				pthread_mutex_unlock(&m_clip);
 				
@@ -344,7 +348,7 @@ void * thread_2_handler(void * arg){
 	int client_fd;
 	
 	//Other variables
-	int port=rand()%1000+8000;
+	int port=rand()%100+8000;
 	pthread_t thread_id;
 	C_peers* peers = (C_peers*)arg;
 	T_param param;
